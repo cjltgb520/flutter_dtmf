@@ -77,6 +77,7 @@ public class SwiftFlutterDtmfPlugin: NSObject, FlutterPlugin {
 
             if _engine.isRunning{
                 _engine.pause()
+                _engine.detach(_player)
             }
             _engine.attach(_player)
             _engine.connect(_player, to:_mixer, format:audioFormat)
