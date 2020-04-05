@@ -8,10 +8,13 @@ public class SwiftFlutterDtmfPlugin: NSObject, FlutterPlugin {
     var _player:AVAudioPlayerNode
     var _mixer: AVAudioMixerNode
     
+    var isSwitchSpeaker:Bool
+
     public override init() {
         _engine = AVAudioEngine();
         _player = AVAudioPlayerNode()
         _mixer = _engine.mainMixerNode;
+        isSwitchSpeaker=false;
         print("SwiftFlutterDtmfPlugin init")
         super.init()
     }
@@ -67,11 +70,36 @@ public class SwiftFlutterDtmfPlugin: NSObject, FlutterPlugin {
             let samplingRate =  arguments?["samplingRate"] as? Double ?? 8000.0
             playTone(digits: "Z", samplingRate: samplingRate, markSpace: DTMF.middle)
         }
+        else if call.method == "pauseCallWaiting"
+        {
+            isSwitchSpeaker = !isSwitchSpeaker
+            //正在切换
+            if isSwitchSpeaker{
+                if _player.isPlaying{
+                    print("pauseCallWaiting isPlaying")
+                    _player.stop()
+                    print("pauseCallWaiting _player is stop")
+                }
+                if _engine.isRunning{
+                     print("pauseCallWaiting isRunning")
+                    _engine.detach(_player)
+                    _engine.pause()
+                    print("pauseCallWaiting _engine is pause")
+
+                }
+            }
+
+            result(nil)
+        }
 
     }
 
     func playTone(digits: String, samplingRate: Double, markSpace: MarkSpaceType = DTMF.motorola)
     {
+        //正在切换听筒扬声器，导致q引擎isRunning返回false
+        if isSwitchSpeaker{
+            return
+        }
         let _sampleRate = Float(samplingRate)
 
         if let tones = DTMF.tonesForString(digits) {
@@ -114,7 +142,7 @@ public class SwiftFlutterDtmfPlugin: NSObject, FlutterPlugin {
                 try _engine.start()
                 _player.scheduleBuffer(buffer, at:nil,completionHandler:nil)
 
-                //挂断时被终止了
+                //切换听筒外放被终止了
                 if _engine.isRunning {
                     print("playTone isRunning")
 

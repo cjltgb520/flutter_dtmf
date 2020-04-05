@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 class FlutterDtmf {
   static const MethodChannel _channel =
-      const MethodChannel('flutter_dtmf');
+  const MethodChannel('flutter_dtmf');
 
   static Future<String> get platformVersion async {
     final String version = await _channel.invokeMethod('getPlatformVersion');
@@ -32,5 +32,8 @@ class FlutterDtmf {
   }
   static Future<void> releaseGenerator() async {
     await _channel.invokeMethod('releaseGenerator');
+  }
+  static Future<void> pauseCallWaiting() async {
+    await _channel.invokeMethod('pauseCallWaiting');
   }
 }
