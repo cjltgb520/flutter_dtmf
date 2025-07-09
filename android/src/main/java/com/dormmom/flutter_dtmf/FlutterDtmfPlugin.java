@@ -2,27 +2,38 @@ package com.dormmom.flutter_dtmf;
 
 import android.media.AudioManager;
 import android.media.ToneGenerator;
+import androidx.annotation.NonNull; // 保留此导入，用于 @NonNull 注解
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
-import io.flutter.plugin.common.PluginRegistry.Registrar;
 
 /**
  * FlutterDtmfPlugin
  */
+// 类已经正确实现了 FlutterPlugin 和 MethodCallHandler
 public class FlutterDtmfPlugin implements FlutterPlugin, MethodCallHandler {
+    private MethodChannel channel; // 在类级别声明 channel，以便在 onDetachedFromEngine 中访问
     private ToneGenerator generator;
     private ToneGenerator voiceGenerator;
 
     @Override
-    public void onAttachedToEngine(FlutterPluginBinding flutterPluginBinding) {
-        final MethodChannel channel = new MethodChannel(flutterPluginBinding.getFlutterEngine().getDartExecutor(), "flutter_dtmf");
-        channel.setMethodCallHandler(new FlutterDtmfPlugin());
+    public void onAttachedToEngine(@NonNull FlutterPlugin.FlutterPluginBinding flutterPluginBinding) {
+        // 获取 BinaryMessenger 的正确方式
+        channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "flutter_dtmf");
+        // 将当前插件实例设置为 MethodCallHandler
+        channel.setMethodCallHandler(this);
+
+        // 如果生成器需要与插件的生命周期绑定，则在此处初始化它们
+        // 注意：原始代码是在 playVoiceTone/playTone 内部惰性初始化的。
+        // 如果它们需要在插件连接时始终可用，则在此处初始化。
+        // 否则，保持惰性初始化，但要确保正确释放。
     }
 
+    // 移除整个静态块：这是旧的注册方法。
+    /*
     // This static function is optional and equivalent to onAttachedToEngine. It supports the old
     // pre-Flutter-1.12 Android projects. You are encouraged to continue supporting
     // plugin registration via this function while apps migrate to use the new Android APIs
@@ -36,9 +47,10 @@ public class FlutterDtmfPlugin implements FlutterPlugin, MethodCallHandler {
         final MethodChannel channel = new MethodChannel(registrar.messenger(), "flutter_dtmf");
         channel.setMethodCallHandler(new FlutterDtmfPlugin());
     }
+    */
 
     @Override
-    public void onMethodCall(MethodCall call, Result result) {
+    public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
         switch (call.method) {
             case "getPlatformVersion":
                 result.success("Android " + android.os.Build.VERSION.RELEASE);
@@ -97,9 +109,13 @@ public class FlutterDtmfPlugin implements FlutterPlugin, MethodCallHandler {
             }
             for (int i = 0; i < digits.length(); i++) {
                 int toneType = getToneType(digits.charAt(i));
-                voiceGenerator.startTone(toneType, 200);
+                // 检查 toneType 是否有效（-1 表示无效数字）
+                if (toneType != -1) {
+                    voiceGenerator.startTone(toneType, 200);
+                }
             }
         } catch (Exception ignore) {
+            // 考虑记录异常以便调试
         }
     }
 
@@ -143,6 +159,17 @@ public class FlutterDtmfPlugin implements FlutterPlugin, MethodCallHandler {
     }
 
     @Override
-    public void onDetachedFromEngine(FlutterPluginBinding binding) {
+    public void onDetachedFromEngine(@NonNull FlutterPlugin.FlutterPluginBinding binding) {
+        // 至关重要：当引擎分离时清理资源
+        channel.setMethodCallHandler(null); // 取消设置处理器以避免内存泄漏
+        if (generator != null) {
+            generator.release();
+            generator = null;
+        }
+        if (voiceGenerator != null) {
+            voiceGenerator.release();
+            voiceGenerator = null;
+        }
+        // 如果 'binding' 未存储为类成员，则无需清除它
     }
 }
